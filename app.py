@@ -44,7 +44,13 @@ class WindowsVolumeController:
             interface = raw_device.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
             return cast(interface, POINTER(IAudioEndpointVolume))
 
-        raise RuntimeError("当前 pycaw 版本不支持该音量初始化方式，请升级 pycaw。")
+        ctl = getattr(device, "_ctl", None)
+        if ctl is not None and hasattr(ctl, "QueryInterface"):
+            return ctl.QueryInterface(IAudioEndpointVolume)
+
+        raise RuntimeError(
+            "当前 pycaw 版本不支持该音量初始化方式。请更新 requirements 后重新打包 EXE。"
+        )
 
     def mute(self) -> None:
         self._volume.SetMute(1, None)
