@@ -56,7 +56,13 @@ python -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.
 
 ### 方式 1：一键打包（推荐）
 
-在仓库根目录双击或执行：
+在仓库根目录双击或执行（推荐 PowerShell）：
+
+```powershell
+PowerShell -ExecutionPolicy Bypass -File .\build_windows_exe.ps1
+```
+
+或继续使用 bat：
 
 ```bat
 build_windows_exe.bat
@@ -69,6 +75,8 @@ build_windows_exe.bat
 ### 常见问题：双击 bat 没反应
 
 已在脚本中增加日志和 `pause`，现在会显示执行步骤与错误原因。
+
+另外提供了 `build_windows_exe.ps1`，通常在 Windows 上提示更清晰，建议优先使用。
 
 如果仍失败，请重点检查：
 
