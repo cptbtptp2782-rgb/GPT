@@ -7,6 +7,8 @@ from ctypes import POINTER, cast
 from pathlib import Path
 from tkinter import messagebox
 
+import pystray
+from PIL import Image, ImageDraw
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
@@ -29,7 +31,6 @@ class WindowsVolumeController:
     def _create_endpoint_volume():
         device = AudioUtilities.GetSpeakers()
 
-        # 兼容不同 pycaw 版本：新版本可能提供 EndpointVolume，旧版本需要 Activate。
         endpoint_volume = getattr(device, "EndpointVolume", None)
         if endpoint_volume is not None:
             return endpoint_volume
@@ -69,8 +70,6 @@ class WindowsVolumeController:
 
 
 class UdpControlServer:
-    """接收 UDP 指令并调用静音控制。"""
-
     def __init__(self, host: str, port: int, handler) -> None:
         self.host = host
         self.port = port
@@ -134,9 +133,13 @@ class MuteControlApp:
         self.controller = self._create_controller()
         self.udp_server: UdpControlServer | None = None
 
+        self.tray_icon: pystray.Icon | None = None
+        self.tray_thread: threading.Thread | None = None
+
         self._build_ui()
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.root.protocol("WM_DELETE_WINDOW", self.minimize_to_tray)
         self.root.after(250, self.start_udp_server)
+        self.root.after(500, self.minimize_to_tray)
 
     def _create_controller(self) -> WindowsVolumeController | None:
         if platform.system() != "Windows":
@@ -177,9 +180,10 @@ class MuteControlApp:
             fg="#666",
             text=(
                 "说明：\n"
-                "1) 程序启动后自动开启 UDP 监听。\n"
+                "1) 启动后自动最小化到托盘后台运行。\n"
                 "2) UDP 指令: mute / unmute / toggle / status\n"
-                f"3) 开机自启动当前状态: {startup_status}"
+                "3) 托盘图标右键可显示主界面或退出。\n"
+                f"4) 开机自启动当前状态: {startup_status}"
             ),
         ).pack(anchor="w", pady=(8, 0))
 
@@ -296,10 +300,60 @@ class MuteControlApp:
         except OSError as err:
             messagebox.showerror("设置失败", f"无法取消开机自启动：{err}")
 
-    def on_close(self) -> None:
+    @staticmethod
+    def _create_tray_image() -> Image.Image:
+        image = Image.new("RGB", (64, 64), (30, 30, 30))
+        draw = ImageDraw.Draw(image)
+        draw.ellipse((12, 12, 52, 52), fill=(0, 180, 120))
+        draw.rectangle((28, 20, 36, 44), fill=(255, 255, 255))
+        return image
+
+    def _ensure_tray_icon(self) -> None:
+        if self.tray_icon is not None:
+            return
+
+        menu = pystray.Menu(
+            pystray.MenuItem("显示主界面", lambda icon, item: self.show_window()),
+            pystray.MenuItem("退出", lambda icon, item: self.exit_app()),
+        )
+        self.tray_icon = pystray.Icon("windows_mute_control", self._create_tray_image(), "Windows静音控制", menu)
+
+    def _run_tray(self) -> None:
+        if self.tray_icon is None:
+            return
+        self.tray_icon.run()
+
+    def minimize_to_tray(self) -> None:
+        self.root.withdraw()
+        self._ensure_tray_icon()
+        if self.tray_thread is None or not self.tray_thread.is_alive():
+            self.tray_thread = threading.Thread(target=self._run_tray, daemon=True)
+            self.tray_thread.start()
+        self._set_status("程序已最小化到系统托盘")
+
+    def show_window(self) -> None:
+        self.root.after(0, self._show_window_on_ui)
+
+    def _show_window_on_ui(self) -> None:
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+
+    def exit_app(self) -> None:
+        self.root.after(0, self._exit_app_on_ui)
+
+    def _exit_app_on_ui(self) -> None:
         if self.udp_server is not None:
             self.udp_server.stop()
+
+        if self.tray_icon is not None:
+            self.tray_icon.stop()
+            self.tray_icon = None
+
         self.root.destroy()
+
+    def on_close(self) -> None:
+        self.minimize_to_tray()
 
 
 def main() -> None:
