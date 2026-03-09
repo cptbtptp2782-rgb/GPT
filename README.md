@@ -1,33 +1,76 @@
-# 延迟定点左键点击工具
+# Windows 静音/取消静音工具（支持 UDP 控制）
 
-这是一个简单的桌面应用：首次输入延迟时间与坐标并“保存并执行”后，会持久化配置；后续再次启动程序会自动按该配置执行一次鼠标左键点击。
+一个干净、简单的 Python 桌面程序，用于控制 **Windows** 电脑声音：
 
-## 功能
-
-- 自定义延迟秒数。
-- 自定义点击坐标（X/Y）。
-- 首次保存后自动持久化配置到本地文件。
-- 程序后续启动时自动读取配置并执行点击。
+- 静音
+- 取消静音
+- 切换静音状态
+- UDP 远程指令控制（启动后自动开启）
+- 开机自启动 / 取消开机自启动
 
 ## 运行环境
 
+- Windows 10/11
 - Python 3.9+
-- Windows / macOS / Linux（需允许自动化控制鼠标权限）
 
-## 安装与启动
+## 开发环境启动
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows 请使用 .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
 
-## 使用说明
+## UDP 控制说明
 
-1. 首次运行，输入延迟时间（秒）和目标坐标 X/Y。
-2. 点击“保存并执行”。
-3. 程序会把参数保存到 `click_config.json`。
-4. 下次运行 `python app.py` 时，会自动读取并执行，无需重复输入。
+程序启动后会自动开启 UDP 监听（默认端口 `9999`，可在界面修改）。
 
-> 小技巧：如果你不清楚坐标，可在终端运行 `python -m pyautogui` 查看当前鼠标位置。
+支持以下指令（UTF-8 文本）：
+
+- `mute`：静音
+- `unmute`：取消静音
+- `toggle`：切换静音
+- `status`：查询当前状态
+
+本机测试示例：
+
+```bash
+python -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.sendto(b'mute', ('127.0.0.1', 9999)); print(s.recvfrom(1024)[0].decode())"
+```
+
+返回示例：`OK: muted` / `OK: unmuted` / `ERROR: ...`
+
+## 开机自启动
+
+界面提供两个按钮：
+
+- `开启开机自启动`
+- `取消开机自启动`
+
+实现方式为写入/删除当前用户注册表项：
+
+- `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
+
+## 打包为 EXE（Windows）
+
+### 方式 1：一键打包（推荐）
+
+在仓库根目录双击或执行：
+
+```bat
+build_windows_exe.bat
+```
+
+打包完成后可执行文件位置：
+
+- `dist\Windows静音控制.exe`
+
+### 方式 2：手动打包
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt pyinstaller
+pyinstaller --noconfirm --clean mute_control.spec
+```
