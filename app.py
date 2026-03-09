@@ -23,9 +23,28 @@ class WindowsVolumeController:
     """控制 Windows 系统主输出设备静音状态。"""
 
     def __init__(self) -> None:
-        speakers = AudioUtilities.GetSpeakers()
-        endpoint = speakers.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        self._volume = cast(endpoint, POINTER(IAudioEndpointVolume))
+        self._volume = self._create_endpoint_volume()
+
+    @staticmethod
+    def _create_endpoint_volume():
+        device = AudioUtilities.GetSpeakers()
+
+        # 兼容不同 pycaw 版本：新版本可能提供 EndpointVolume，旧版本需要 Activate。
+        endpoint_volume = getattr(device, "EndpointVolume", None)
+        if endpoint_volume is not None:
+            return endpoint_volume
+
+        activate = getattr(device, "Activate", None)
+        if callable(activate):
+            interface = activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            return cast(interface, POINTER(IAudioEndpointVolume))
+
+        raw_device = getattr(device, "_device", None)
+        if raw_device is not None and hasattr(raw_device, "Activate"):
+            interface = raw_device.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            return cast(interface, POINTER(IAudioEndpointVolume))
+
+        raise RuntimeError("当前 pycaw 版本不支持该音量初始化方式，请升级 pycaw。")
 
     def mute(self) -> None:
         self._volume.SetMute(1, None)

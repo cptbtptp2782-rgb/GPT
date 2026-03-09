@@ -83,6 +83,7 @@ build_windows_exe.bat
 1. 是否已安装 Python 3.9+。
 2. `py` 或 `python` 是否在 PATH 中（在 `cmd` 执行 `py --version` 或 `python --version`）。
 3. 是否被杀毒软件拦截了 `pyinstaller`。
+4. 若提示“`AudioDevice` 没有 `Activate`”，请升级到最新代码（已兼容多版本 pycaw 初始化方式）。
 
 ### 方式 2：手动打包
 
