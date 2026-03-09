@@ -66,6 +66,16 @@ build_windows_exe.bat
 
 - `dist\Windows静音控制.exe`
 
+### 常见问题：双击 bat 没反应
+
+已在脚本中增加日志和 `pause`，现在会显示执行步骤与错误原因。
+
+如果仍失败，请重点检查：
+
+1. 是否已安装 Python 3.9+。
+2. `py` 或 `python` 是否在 PATH 中（在 `cmd` 执行 `py --version` 或 `python --version`）。
+3. 是否被杀毒软件拦截了 `pyinstaller`。
+
 ### 方式 2：手动打包
 
 ```bat
