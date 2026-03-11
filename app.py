@@ -164,7 +164,7 @@ class MuteControlApp:
         udp_row.pack(fill=tk.X, pady=(8, 4))
         tk.Label(udp_row, text="UDP端口:").pack(side=tk.LEFT)
         tk.Entry(udp_row, textvariable=self.udp_port_var, width=8).pack(side=tk.LEFT, padx=(4, 8))
-        tk.Button(udp_row, text="启动UDP控制", command=self.start_udp_server).pack(side=tk.LEFT)
+        tk.Button(udp_row, text="端口修改确认", command=self.confirm_udp_port).pack(side=tk.LEFT)
 
         startup_row = tk.Frame(frame)
         startup_row.pack(fill=tk.X, pady=(4, 4))
@@ -181,9 +181,10 @@ class MuteControlApp:
             text=(
                 "说明：\n"
                 "1) 启动后自动最小化到托盘后台运行。\n"
-                "2) UDP 指令: mute / unmute / toggle / status\n"
-                "3) 托盘图标右键可显示主界面或退出。\n"
-                f"4) 开机自启动当前状态: {startup_status}"
+                "2) UDP 默认自启动，可修改端口后点“端口修改确认”。\n"
+                "3) UDP 指令: mute / unmute / toggle / status\n"
+                "4) 托盘图标右键可显示主界面或退出。\n"
+                f"5) 开机自启动当前状态: {startup_status}"
             ),
         ).pack(anchor="w", pady=(8, 0))
 
@@ -228,18 +229,39 @@ class MuteControlApp:
             return "OK"
         return self._run_action(command)
 
-    def start_udp_server(self) -> None:
-        if self.udp_server is not None:
-            self._set_status("UDP服务已启动")
-            return
-
+    def _get_udp_port(self) -> int | None:
         try:
             port = int(self.udp_port_var.get())
             if not (1 <= port <= 65535):
                 raise ValueError
+            return port
         except ValueError:
             messagebox.showerror("端口错误", "请输入 1-65535 的端口号")
+            return None
+
+    def start_udp_server(self) -> None:
+        if self.udp_server is not None:
             return
+
+        port = self._get_udp_port()
+        if port is None:
+            return
+
+        self.udp_server = UdpControlServer("0.0.0.0", port, self._handle_udp_command)
+        self.udp_server.start()
+
+    def confirm_udp_port(self) -> None:
+        port = self._get_udp_port()
+        if port is None:
+            return
+
+        if self.udp_server is not None and self.udp_server.port == port:
+            self._set_status(f"UDP端口未变化，当前端口：{port}")
+            return
+
+        if self.udp_server is not None:
+            self.udp_server.stop()
+            self.udp_server = None
 
         self.udp_server = UdpControlServer("0.0.0.0", port, self._handle_udp_command)
         self.udp_server.start()
