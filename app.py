@@ -20,7 +20,25 @@ else:
 
 STARTUP_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 STARTUP_APP_NAME = "WindowsMuteControlApp"
-CONFIG_PATH = Path(__file__).with_name("app_config.json")
+APP_DIR_NAME = "WindowsMuteControl"
+
+
+def _get_config_path() -> Path:
+    if platform.system() == "Windows":
+        appdata = Path.home() / "AppData" / "Roaming"
+        config_dir = appdata / APP_DIR_NAME
+    else:
+        config_dir = Path.home() / ".windows_mute_control"
+
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir / "app_config.json"
+
+
+def _get_legacy_config_path() -> Path:
+    return Path(__file__).with_name("app_config.json")
+
+
+CONFIG_PATH = _get_config_path()
 
 
 class WindowsVolumeController:
@@ -192,16 +210,22 @@ class MuteControlApp:
 
 
     def _load_udp_port(self) -> int:
-        if not CONFIG_PATH.exists():
-            return 9999
+        config_paths = [CONFIG_PATH, _get_legacy_config_path()]
 
-        try:
-            config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-            port = int(config.get("udp_port", 9999))
-            if 1 <= port <= 65535:
-                return port
-        except (OSError, ValueError, json.JSONDecodeError):
-            pass
+        for path in config_paths:
+            if not path.exists():
+                continue
+
+            try:
+                config = json.loads(path.read_text(encoding="utf-8"))
+                port = int(config.get("udp_port", 9999))
+                if 1 <= port <= 65535:
+                    if path != CONFIG_PATH:
+                        self._save_udp_port(port)
+                    return port
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+
         return 9999
 
     def _save_udp_port(self, port: int) -> None:

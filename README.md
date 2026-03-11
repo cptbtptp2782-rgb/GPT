@@ -37,6 +37,8 @@ python app.py
 
 如需修改端口，在界面输入新端口后点击 `端口修改确认`，程序会自动重启 UDP 监听到新端口，并保存该端口供下次启动自动使用。
 
+端口配置会保存到当前用户目录：`%APPDATA%\WindowsMuteControl\app_config.json`。
+
 支持以下指令（UTF-8 文本）：
 
 - `mute`：静音
