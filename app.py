@@ -1,3 +1,4 @@
+import json
 import platform
 import socket
 import sys
@@ -19,6 +20,7 @@ else:
 
 STARTUP_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 STARTUP_APP_NAME = "WindowsMuteControlApp"
+CONFIG_PATH = Path(__file__).with_name("app_config.json")
 
 
 class WindowsVolumeController:
@@ -128,7 +130,7 @@ class MuteControlApp:
         self.root.resizable(False, False)
 
         self.status_var = tk.StringVar(value="请选择操作")
-        self.udp_port_var = tk.StringVar(value="9999")
+        self.udp_port_var = tk.StringVar(value=str(self._load_udp_port()))
 
         self.controller = self._create_controller()
         self.udp_server: UdpControlServer | None = None
@@ -187,6 +189,29 @@ class MuteControlApp:
                 f"5) 开机自启动当前状态: {startup_status}"
             ),
         ).pack(anchor="w", pady=(8, 0))
+
+
+    def _load_udp_port(self) -> int:
+        if not CONFIG_PATH.exists():
+            return 9999
+
+        try:
+            config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            port = int(config.get("udp_port", 9999))
+            if 1 <= port <= 65535:
+                return port
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+        return 9999
+
+    def _save_udp_port(self, port: int) -> None:
+        try:
+            CONFIG_PATH.write_text(
+                json.dumps({"udp_port": port}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except OSError as err:
+            messagebox.showerror("保存失败", f"无法保存端口配置：{err}")
 
     def _set_status(self, text: str) -> None:
         self.root.after(0, lambda: self.status_var.set(text))
@@ -249,6 +274,7 @@ class MuteControlApp:
 
         self.udp_server = UdpControlServer("0.0.0.0", port, self._handle_udp_command)
         self.udp_server.start()
+        self._save_udp_port(port)
 
     def confirm_udp_port(self) -> None:
         port = self._get_udp_port()
@@ -265,6 +291,7 @@ class MuteControlApp:
 
         self.udp_server = UdpControlServer("0.0.0.0", port, self._handle_udp_command)
         self.udp_server.start()
+        self._save_udp_port(port)
 
     def _startup_command(self) -> str:
         if getattr(sys, "frozen", False):
